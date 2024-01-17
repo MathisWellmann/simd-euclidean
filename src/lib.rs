@@ -8,8 +8,8 @@
 //!     let a = (0..i).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
 //!     let b = (0..i).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
 
-//!     let v = Vectorized::distance(&a, &b);
-//!     let n = Naive::distance(&a, &b);
+//!     let v = Vectorized::distance_z_normalized(&a, &b, 0.0, 1.0);
+//!     let n = Naive::distance_z_normalized(&a, &b, 0.0, 1.0);
 //!     assert!((n-v).abs() < 0.00001);
 //! }
 //! ```
@@ -32,99 +32,173 @@ pub trait Naive {
     type Output;
     type Ty;
 
-    fn squared_distance(self, other: Self) -> Self::Output;
-    fn distance(self, other: Self) -> Self::Output;
+    fn squared_distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output;
+
+    fn distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output;
 }
 
 pub trait Vectorized {
     type Output;
-    fn squared_distance(self, other: Self) -> Self::Output;
-    fn distance(self, other: Self) -> Self::Output;
+    /// We compute the squared_distance between the z-normalized `self` window
+    /// and the unnormalized `other` window, which we z normalize (aka (x - mean) / std).
+    fn squared_distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output;
+
+    fn distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output;
 }
 
 impl_naive!(f64, f64);
 impl_naive!(f32, f32);
 
-/// Calculate the euclidean distance between two slices of equal length
-///
-/// # Panics
-///
-/// Will panic if the lengths of the slices are not equal
-pub fn scalar_euclidean<T: Naive>(a: T, b: T) -> T::Output {
-    Naive::distance(a, b)
+/// Calculate the euclidean distance between two slices of equal length                                                
+///                                                                                                                    
+/// # Panics                                                                                                           
+///                                                                                                                    
+/// Will panic if the lengths of the slices are not equal                                                              
+pub fn scalar_euclidean_z_normalized<T: Naive>(
+    a: T,
+    b: T,
+    b_mean: T::Output,
+    b_std: T::Output,
+) -> T::Output {
+    Naive::distance_z_normalized(a, b, b_mean, b_std)
 }
 
-/// SIMD-capable calculation of the euclidean distance between two slices
-/// of equal length
-///
-/// ```rust
-/// # use simd_euclidean::*;
-/// let distance = vector_euclidean(&[0.1, 0.2, 0.3, 0.4f32] as &[f32], &[0.4, 0.3, 0.2, 0.1f32]);
-/// ```
-/// # Panics
-///
-/// Will panic if the lengths of the slices are not equal
-pub fn vector_euclidean<T: Vectorized>(a: T, b: T) -> T::Output {
-    Vectorized::distance(a, b)
+/// SIMD-capable calculation of the euclidean distance between two slices                                              
+/// of equal length                                                                                                    
+///                                                                                                                    
+/// ```rust                                                                                                            
+/// # use simd_euclidean::*;                                                                                           
+/// let distance = vector_euclidean_z_normalized(&[0.1, 0.2, 0.3, 0.4f32] as &[f32], &[0.4, 0.3, 0.2, 0.1f32], 0.0, 1.0);     
+/// ```                                                                                                                
+/// # Panics                                                                                                           
+///                                                                                                                    
+/// Will panic if the lengths of the slices are not equal                                                              
+pub fn vector_euclidean_z_normalized<T: Vectorized>(
+    a: T,
+    b: T,
+    b_mean: T::Output,
+    b_std: T::Output,
+) -> T::Output {
+    Vectorized::distance_z_normalized(a, b, b_mean, b_std)
 }
 
 impl Vectorized for &[f32] {
     type Output = f32;
-    fn squared_distance(self, other: Self) -> Self::Output {
+    fn squared_distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
         if self.len() >= 64 {
-            F32x8::squared_distance(self, other)
+            F32x8::squared_distance_z_normalized(self, other, other_mean, other_std)
         } else {
-            F32x4::squared_distance(self, other)
+            F32x4::squared_distance_z_normalized(self, other, other_mean, other_std)
         }
     }
 
-    fn distance(self, other: Self) -> Self::Output {
-        Vectorized::squared_distance(self, other).sqrt()
+    fn distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
+        Vectorized::squared_distance_z_normalized(self, other, other_mean, other_std).sqrt()
     }
 }
 
 impl Vectorized for &Vec<f32> {
     type Output = f32;
-    fn squared_distance(self, other: Self) -> Self::Output {
+    fn squared_distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
         if self.len() >= 64 {
-            F32x8::squared_distance(self, other)
+            F32x8::squared_distance_z_normalized(self, other, other_mean, other_std)
         } else {
-            F32x4::squared_distance(self, other)
+            F32x4::squared_distance_z_normalized(self, other, other_mean, other_std)
         }
     }
 
-    fn distance(self, other: Self) -> Self::Output {
-        Vectorized::squared_distance(self, other).sqrt()
+    fn distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
+        Vectorized::squared_distance_z_normalized(self, other, other_mean, other_std).sqrt()
     }
 }
 
 impl Vectorized for &[f64] {
     type Output = f64;
-    fn squared_distance(self, other: Self) -> Self::Output {
+    fn squared_distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
         if self.len() >= 16 {
-            F64x4::squared_distance(self, other)
+            F64x4::squared_distance_z_normalized(self, other, other_mean, other_std)
         } else {
-            F64x2::squared_distance(self, other)
+            F64x2::squared_distance_z_normalized(self, other, other_mean, other_std)
         }
     }
 
-    fn distance(self, other: Self) -> Self::Output {
-        Vectorized::squared_distance(self, other).sqrt()
+    fn distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
+        Vectorized::squared_distance_z_normalized(self, other, other_mean, other_std).sqrt()
     }
 }
 
 impl Vectorized for &Vec<f64> {
     type Output = f64;
-    fn squared_distance(self, other: Self) -> Self::Output {
+    fn squared_distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
         if self.len() >= 16 {
-            F64x4::squared_distance(self, other)
+            F64x4::squared_distance_z_normalized(self, other, other_mean, other_std)
         } else {
-            F64x2::squared_distance(self, other)
+            F64x2::squared_distance_z_normalized(self, other, other_mean, other_std)
         }
     }
 
-    fn distance(self, other: Self) -> Self::Output {
-        Vectorized::squared_distance(self, other).sqrt()
+    fn distance_z_normalized(
+        self,
+        other: Self,
+        other_mean: Self::Output,
+        other_std: Self::Output,
+    ) -> Self::Output {
+        Vectorized::squared_distance_z_normalized(self, other, other_mean, other_std).sqrt()
     }
 }
 
@@ -152,26 +226,26 @@ mod test {
         for i in 0..XS.len() {
             let x = &XS[..i];
             let y = &YS[..i];
-            let res = scalar_euclidean(x, y);
+            let res = scalar_euclidean_z_normalized(x, y, 0.0, 1.0);
             assert!(
-                (Vectorized::distance(x, y) - res).abs() < 0.0001,
+                (Vectorized::distance_z_normalized(x, y, 0.0, 1.0) - res).abs() < 0.0001,
                 "iter {}, {} != {}",
                 i,
-                Vectorized::distance(x, y),
+                Vectorized::distance_z_normalized(x, y, 0.0, 1.0),
                 res
             );
             assert!(
-                (F32x8::distance(x, y) - res).abs() < 0.0001,
+                (F32x8::distance_z_normalized(x, y, 0.0, 1.0) - res).abs() < 0.0001,
                 "iter {}, {} != {}",
                 i,
-                F32x8::distance(x, y),
+                F32x8::distance_z_normalized(x, y, 0.0, 1.0),
                 res
             );
             assert!(
-                (F32x4::distance(x, y) - res).abs() < 0.0001,
+                (F32x4::distance_z_normalized(x, y, 0.0, 1.0) - res).abs() < 0.0001,
                 "iter {}, {} != {}",
                 i,
-                F32x4::distance(x, y),
+                F32x4::distance_z_normalized(x, y, 0.0, 1.0),
                 res
             );
         }
@@ -193,7 +267,9 @@ mod test {
                 b.push(rng.gen::<f32>());
             }
 
-            let diff = (vector_euclidean(&a, &b) - scalar_euclidean(&a, &b)).abs();
+            let diff = (vector_euclidean_z_normalized(&a, &b, 0.0, 1.0)
+                - scalar_euclidean_z_normalized(&a, &b, 0.0, 1.0))
+            .abs();
             assert!(diff <= 0.0001, "diff = {}, len = {}", diff, i);
         }
     }

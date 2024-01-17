@@ -134,10 +134,15 @@ macro_rules! impl_euclidean {
 
             /// Calculate euclidean distance between two slices of equal length,
             /// using auto-vectorized SIMD primitives
-            pub fn squared_distance(a: &[$ty], b: &[$ty]) -> $ty {
+            pub fn squared_distance_z_normalized(
+                a: &[$ty],
+                b: &[$ty],
+                b_mean: $ty,
+                b_std: $ty,
+            ) -> $ty {
                 assert_eq!(a.len(), b.len());
                 if a.len() < $name::lanes() {
-                    return Naive::squared_distance(a, b);
+                    return Naive::squared_distance_z_normalized(a, b, b_mean, b_std);
                 }
 
                 let mut i = 0;
@@ -152,13 +157,13 @@ macro_rules! impl_euclidean {
 
                 let mut sum = sum.horizontal_add();
                 if i < a.len() {
-                    sum += Naive::squared_distance(&a[i..], &b[i..]);
+                    sum += Naive::squared_distance_z_normalized(&a[i..], &b[i..], b_mean, b_std);
                 }
                 sum
             }
 
-            pub fn distance(a: &[$ty], b: &[$ty]) -> $ty {
-                $name::squared_distance(a, b).sqrt()
+            pub fn distance_z_normalized(a: &[$ty], b: &[$ty], b_mean: $ty, b_std: $ty) -> $ty {
+                $name::squared_distance_z_normalized(a, b, b_mean, b_std).sqrt()
             }
         }
     };
@@ -169,37 +174,57 @@ macro_rules! impl_naive {
         impl Naive for &[$ty1] {
             type Output = $ty2;
             type Ty = $ty1;
-            fn squared_distance(self, other: Self) -> $ty2 {
+            fn squared_distance_z_normalized(
+                self,
+                other: Self,
+                other_mean: Self::Output,
+                other_std: Self::Output,
+            ) -> $ty2 {
                 assert_eq!(self.len(), other.len());
 
                 let mut sum = 0 as $ty2;
                 for i in 0..self.len() {
-                    let d = self[i] - other[i];
+                    let d = self[i] - (other[i] - other_mean) / other_std;
                     sum += (d * d) as $ty2;
                 }
                 sum
             }
 
-            fn distance(self, other: Self) -> $ty2 {
-                Naive::squared_distance(self, other).sqrt()
+            fn distance_z_normalized(
+                self,
+                other: Self,
+                other_mean: Self::Output,
+                other_std: Self::Output,
+            ) -> $ty2 {
+                Naive::squared_distance_z_normalized(self, other, other_mean, other_std).sqrt()
             }
         }
         impl Naive for &Vec<$ty1> {
             type Output = $ty2;
             type Ty = $ty1;
-            fn squared_distance(self, other: Self) -> $ty2 {
+            fn squared_distance_z_normalized(
+                self,
+                other: Self,
+                other_mean: Self::Output,
+                other_std: Self::Output,
+            ) -> $ty2 {
                 assert_eq!(self.len(), other.len());
 
                 let mut sum = 0 as $ty2;
                 for i in 0..self.len() {
-                    let d = self[i] - other[i];
+                    let d = self[i] - (other[i] - other_mean) / other_std;
                     sum += (d * d) as $ty2;
                 }
                 sum
             }
 
-            fn distance(self, other: Self) -> $ty2 {
-                Naive::squared_distance(self, other).sqrt()
+            fn distance_z_normalized(
+                self,
+                other: Self,
+                other_mean: Self::Output,
+                other_std: Self::Output,
+            ) -> $ty2 {
+                Naive::squared_distance_z_normalized(self, other, other_mean, other_std).sqrt()
             }
         }
     };

@@ -23,13 +23,18 @@ fn bench_random(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("Naive_{i}")),
             &(&a, &b),
             |bencher, (a, b)| {
-                bencher.iter(|| Naive::distance(black_box(*a), black_box(*b)));
+                bencher
+                    .iter(|| Naive::distance_z_normalized(black_box(*a), black_box(*b), 0.0, 1.0));
             },
         );
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("Vectorized_{i}")),
             &(&a, &b),
-            |bencher, (a, b)| bencher.iter(|| Vectorized::distance(black_box(*a), black_box(*b))),
+            |bencher, (a, b)| {
+                bencher.iter(|| {
+                    Vectorized::distance_z_normalized(black_box(*a), black_box(*b), 0.0, 1.0)
+                })
+            },
         );
     }
 
