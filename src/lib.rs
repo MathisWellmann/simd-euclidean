@@ -305,4 +305,17 @@ mod test {
         let c = a - b;
         assert_eq!(c, F32x4::new(-3.0, -1.0, 1.0, 3.0));
     }
+
+    #[test]
+    fn z_normalization() {
+        const VALS: &[f32] = &[3.0, 5.0, 5.0, 8.0, 9.0, 12.0];
+        const MEAN: f32 = 7.0;
+        const STD: f32 = 3.0;
+        let norm = Vec::from_iter(VALS.iter().map(|v| (v - MEAN) / STD));
+
+        assert_eq!(
+            vector_euclidean_z_normalized(&norm, &VALS.to_vec(), MEAN, STD),
+            0.0
+        );
+    }
 }

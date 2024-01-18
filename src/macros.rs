@@ -124,11 +124,12 @@ macro_rules! impl_euclidean {
     ($name:ident, $ty:ty) => {
         use $crate::Naive;
         impl $name {
-            /// Calculate the squared distance between two slices
-            pub fn euclidean_inner(a: &[$ty], b: &[$ty]) -> $name {
+            /// Calculate the squared distance between two slices.
+            /// The values from `b` will be z-normalized.
+            pub fn euclidean_inner(a: &[$ty], b: &[$ty], b_mean: $name, b_std: $name) -> $name {
                 let i = $name::from_slice(a);
                 let j = $name::from_slice(b);
-                let u = i - j;
+                let u = i - (j - b_mean) / b_std;
                 u * u
             }
 
@@ -147,10 +148,14 @@ macro_rules! impl_euclidean {
 
                 let mut i = 0;
                 let mut sum = $name::splat(0 as $ty);
+                let b_mean_splat = $name::splat(b_mean);
+                let b_std_splat = $name::splat(b_std);
                 while a.len() - $name::lanes() >= i {
                     sum += $name::euclidean_inner(
                         &a[i..i + $name::lanes()],
                         &b[i..i + $name::lanes()],
+                        b_mean_splat,
+                        b_std_splat,
                     );
                     i += $name::lanes();
                 }

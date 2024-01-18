@@ -2,7 +2,7 @@
 name = "simd_euclidean"
 version = "0.2.0"
 authors = ["Michael Lazear <lazear@scripps.edu>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 
 [dev-dependencies]
